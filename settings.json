@@ -1,0 +1,6 @@
+{
+  "ttl_pro_max": 3600,
+  "ttl_default": 300,
+  "cache_prefix": "sce",
+  "log_level": "info"
+}

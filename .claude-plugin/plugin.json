@@ -1,0 +1,11 @@
+{
+  "name": "sudolang-cache-engine",
+  "description": "Ultra-efficient prompt caching via SudoLang structural context engineering. Guarantees byte-for-byte cache stability with Frente Estable/Fondo Volátil pattern.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Binaural Dev",
+    "url": "https://github.com/binaural-dev"
+  },
+  "keywords": ["sudolang", "cache", "prompt-engineering", "context-engineering", "token-optimization"],
+  "defaultEnabled": true
+}
