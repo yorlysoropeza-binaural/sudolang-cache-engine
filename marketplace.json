@@ -1,0 +1,12 @@
+{
+  "name": "local",
+  "description": "Local plugins for Binaural/Integra workspace",
+  "plugins": [
+    {
+      "name": "sudolang-cache-engine",
+      "description": "Ultra-efficient prompt caching via SudoLang structural context engineering",
+      "version": "1.0.0",
+      "author": "Binaural Dev"
+    }
+  ]
+}
