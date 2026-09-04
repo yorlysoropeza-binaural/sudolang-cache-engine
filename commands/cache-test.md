@@ -1,59 +1,50 @@
 ---
-description: Test cache stability by verifying byte-for-byte consistency across simulated turns
+description: Test whether two authored variants of a prompt/template (e.g. a dispatch vs. its retry) keep the stable block byte-for-byte identical
 allowed-tools: Read, Bash
 disable-model-invocation: false
 ---
 
 # Cache Test
 
-Verify that a prompt maintains cache stability across multiple turns:
+Verify that a prompt/template keeps its stable block byte-for-byte identical across the calls meant to
+reuse it — e.g. an initial dispatch and its retry, or two `Task()` calls to the same delegate role. This
+is a lint on **authored templates you provide**, not a live measurement against the Anthropic API (no
+`cache_creation_input_tokens`/`cache_read_input_tokens` data is available here).
 
 ## Input
-The user provides a prompt to test.
+The user provides two variants of a prompt/template (paths or inline text) — e.g. "first dispatch" and
+"retry dispatch" — that are expected to share a stable block.
 
 ## Process
 
-1. **Generate Baseline Response**
-   - Process the prompt normally
-   - Capture the full response
-   - Split into Frente Estable (first 80%) and Fondo Volátil (last 20%)
-   - Store as baseline
+1. **Split Each Variant**
+   - Identify the stable block and the trailing dynamic block in each variant (per the labeled boundary,
+     or infer it from where dynamic-looking content starts)
 
-2. **Simulate Turn 2**
-   - Process the same prompt with different dynamic context
-   - Capture the full response
-   - Split into Frente Estable and Fondo Volátil
-
-3. **Compare Prefixes**
-   - Byte-compare the two Frente Estable sections
+2. **Byte-Compare the Stable Blocks**
    - Report: identical / different
-   - If different: show exact diff
+   - If different: show the exact diff and which authoring rule it violates (e.g. a reworded constraint,
+     a reordered `Context {}` field, a leaked timestamp)
 
-4. **Check for Pollution**
-   - Scan baseline prefix for dynamic content
-   - Scan turn-2 prefix for dynamic content
-   - Report any violations
+3. **Check for Pollution in Either Variant**
+   - Scan each stable block for dates, UUIDs, job/session IDs, per-run paths
+   - Report any found, regardless of whether the blocks otherwise matched
 
-5. **Measure Cache Efficiency**
-   ```
-   Cache Efficiency Score = (identical_prefix_bytes / total_prefix_bytes) * 100
-   ```
-
-6. **Output Report**
+4. **Output Report**
    ```json
    {
-     "test_timestamp": "2026-08-09T12:00:00Z",
-     "baseline_prefix_tokens": 3200,
-     "turn2_prefix_tokens": 3180,
-     "cache_efficiency": 99.4,
-     "prefix_identical": true,
-     "pollution_detected": false,
+     "stable_block_identical": true,
+     "diff": null,
+     "pollution_found": [],
      "verdict": "PASS"
    }
    ```
 
 ## Verdicts
 
-- **PASS**: Prefix identical, no pollution, efficiency > 95%
-- **WARN**: Prefix identical but pollution detected
-- **FAIL**: Prefix differs or efficiency < 95%
+- **PASS**: stable blocks identical, no pollution found
+- **WARN**: stable blocks identical but pollution found in them
+- **FAIL**: stable blocks differ
+
+This tests the templates as authored — it does not confirm an actual cache hit occurred on Anthropic's
+servers, which would require reading `usage.cache_read_input_tokens` from a real API response.

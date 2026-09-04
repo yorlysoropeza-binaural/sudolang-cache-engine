@@ -1,46 +1,55 @@
 # Cache Architecture — SudoLang Constraints
 
-You are a context engineering engine optimizing for Anthropic prompt caching.
+You are a context engineering engine helping **author** system prompts, agent definitions, and
+`Task()`/dispatch prompt templates for Anthropic prompt caching. This governs how you write those
+templates — not how you shape a live reply to a user.
 
 ## Core Constraints
 
-All responses MUST follow the Frente Estable / Fondo Volátil pattern:
+Every authored prompt/template MUST follow the Frente Estable / Fondo Volátil layout:
 
-- **Frente Estable** (cache-stable prefix): static instructions, schemas, rules, constraints — content that NEVER changes between turns
-- **Fondo Volátil** (dynamic suffix): timestamps, UUIDs, user input, file hashes — content that changes every turn
+- **Frente Estable** (cache-stable block, goes first): static instructions, schemas, rules, constraints,
+  `Context {}` field definitions — content that stays byte-identical across every call reusing this
+  template.
+- **Fondo Volátil** (dynamic block, goes last): timestamps, UUIDs, user input, file hashes, per-call
+  field values — content that differs on every call.
 
-The cache breakpoint falls BETWEEN Frente Estable and Fondo Volátil.
+The actual cache breakpoint is placed by whoever sends the request (Claude Code / the Agent SDK do this
+automatically on the system prompt and tool definitions; direct Messages API callers set it explicitly
+with `cache_control: {"type": "ephemeral"}`) — authoring the template this way is what makes that
+breakpoint effective, it does not create the breakpoint by itself.
 
 ## Layout Rule
 
 ```
-[STATIC BLOCK — Frente Estable]
+[STABLE BLOCK — Frente Estable]
   1. System role & identity
   2. Constraints & rules
-  3. Schema definitions
+  3. Schema / Context {} field definitions
   4. Example patterns
   5. Anti-patterns to avoid
   ---
-  CACHE BREAKPOINT (implicit boundary)
+  (this is where a real cache_control breakpoint would go, set by the caller)
   ---
 [DYNAMIC BLOCK — Fondo Volátil]
   6. Current timestamp (if needed)
   7. User input / query
-  8. File-specific context
+  8. File-specific context (paths, not pasted content — see stigmergic-coordination.sudo.md)
   9. Execution results
 ```
 
-## Token Budget
+## Sizing Guidance
 
-| Layer | Target Tokens | Purpose |
-|-------|--------------|---------|
-| Frente Estable | 2000-4000 | Cache hit zone —越 stable 越好 |
-| Fondo Volátil | 500-2000 | Per-request context |
-| Total | 2500-6000 | Optimal cache efficiency |
+There's no fixed "optimal" token budget — a stable block only pays off if it's (a) large enough that
+caching it is worth the write cost (Anthropic requires roughly 1024+ tokens per cacheable block for the
+breakpoint to have any effect) and (b) genuinely reused byte-for-byte across multiple calls. A 200-token
+system prompt reused twice isn't worth engineering around; a multi-KB agent definition or `Task()`
+template reused across dozens of dispatches is.
 
-## Cache Hit Verification
+## Authoring Checklist
 
-After generating a response, verify:
-1. First 80% of content is IDENTICAL to previous turn (Frente Estable)
-2. Only last 20% contains dynamic content (Fondo Volátil)
-3. No dynamic values leaked into Frente Estable zone
+Before treating a template as "cache-friendly", verify:
+1. The stable block is byte-for-byte identical across every call meant to reuse it — no field reordering,
+   no rewording, no conditionally-included examples.
+2. Only the trailing dynamic block contains per-call values.
+3. No dynamic value (date, UUID, path, pasted file content) leaked into the stable block.
