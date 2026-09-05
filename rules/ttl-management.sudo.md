@@ -40,10 +40,14 @@ edit, for no gain. Instead:
 - Append new information as a new message/turn at the end of the conversation (or, for headless
   agent-to-agent handoffs, as a **new** file/job, never an edit of a previous one).
 - This repo's SDD pipeline already follows this: each OpenCode dispatch gets a new `job_id` under
-  `/tmp/sdd-jobs/<job_id>/`, and a retry after a `sdd-judge` FAIL is a **new** dispatch with a fresh
-  `Context {}` block carrying a "Contexto de reintento: ..." field — it never edits the previous
-  `dispatch.handoff`. Keep replicating that shape for any new stigmergic state (see
-  `stigmergic-coordination.sudo.md`): write a new state file/message, don't mutate the old one in place.
+  `src/.sdd/logs/jobs/<job_id>/` (moved 2026-09-05 from `/tmp/sdd-jobs/<job_id>/`, which didn't survive a
+  host reboot — same append-only principle, just a persistent root), and a retry after a `sdd-judge` FAIL is
+  a **new** dispatch with a fresh `Context {}` block carrying a "Contexto de reintento: ..." field — it never
+  edits the previous `dispatch.handoff`. `src/.sdd/logs/metrics.jsonl` is the clearest example of this in the
+  repo: every dispatch/result/orphaned transition is an **appended** JSON line, never a rewrite of a prior
+  one — the file grows monotonically and stays valid to `tail`/stream even while a job is still running.
+  Keep replicating that shape for any new stigmergic state (see `stigmergic-coordination.sudo.md`): write a
+  new state file/message (or append a line), don't mutate the old one in place.
 - Corollary for anyone editing an agent's own `.md` definition or a shared `AGENTS.md`/`CLAUDE.md`-style
   doc mid-session: expect that edit to cost a fresh cache write on the next turn that loads it — that's
   fine for a genuine content change, but don't churn those files just to log a status; use a sibling

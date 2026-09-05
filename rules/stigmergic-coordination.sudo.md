@@ -32,8 +32,12 @@ reinvent per-feature:
 | `plan.md` | `sdd-architect` | `sdd-pm`, `sdd-builder` |
 | `tasks.md` | `sdd-pm` | `sdd-builder`, `sdd-qc` |
 | `qc-report.md` | `sdd-qc` | `sdd-lead`, `sdd-judge` |
-| `/tmp/sdd-jobs/<job_id>/dispatch.handoff` | `sdd-opencode-runner` (dispatch) | OpenCode `sdd-lead`, later `sdd-judge` |
-| `/tmp/sdd-jobs/<job_id>/result.handoff` | OpenCode pipeline | `sdd-opencode-runner` (status-check), `sdd-judge` |
+| `src/.sdd/logs/jobs/<job_id>/dispatch.handoff` | `sdd-opencode-runner` (dispatch) | OpenCode `sdd-lead`, later `sdd-judge` |
+| `src/.sdd/logs/jobs/<job_id>/result.handoff` | OpenCode pipeline | `sdd-opencode-runner` (status-check), `sdd-judge` |
+| `src/.sdd/logs/metrics.jsonl` | `sdd_opencode_run.sh`/`status.sh` (append-only, one JSON line per transition) | `sdd-metrics-reporter` |
+
+(moved 2026-09-05 from `/tmp/sdd-jobs/` — that root didn't survive a host reboot, losing every job's record;
+`src/.sdd/logs/` is a persistent, repo-relative root instead, overridable via `SDD_LOG_ROOT`.)
 
 None of these are meant to be pasted whole into another agent's prompt — the consuming agent reads the
 file itself. Any **new** delegation added to this pipeline (e.g. `sdd-builder` → `senior-dev`, `sdd-qc` →
@@ -63,6 +67,12 @@ Context {
   <artifact>_ref: <path>#<section/id>
 }
 ```
+
+**Exception — full-pipeline dispatch**: this repo's "Modo Delegación" dispatches the entire pipeline in one
+`Context {}` block (`agent: sdd-lead`, which internally chains spec→architect→pm→builder→qc itself) rather
+than one phase at a time. There, `stage` doesn't apply — omitting it isn't a missing field, it's the correct
+shape for "all stages, single dispatch." Only phase-by-phase dispatch (Modo Manual, targeting `@sdd-spec` /
+`@sdd-architect` / etc. individually) needs to declare `stage`.
 
 This is a lightweight borrowing of the "stage → allowed actions" idea from an external actor-model/FSM
 architecture doc (reviewed 2026-08-31) — without adopting a real finite-state-machine engine: `stage` is

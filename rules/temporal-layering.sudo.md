@@ -50,3 +50,16 @@ When writing or reviewing an agent `.md` / `Task()` template, scan for:
 
 This is a lint on the **template you write**, applied before you send/reuse it — not something the model
 does to its own free-text reply after the fact (a reply has no cache boundary of its own to police).
+
+## Confirmed failure mode: a relay retyping a long prompt is not the same as referencing it
+
+A related but distinct risk from "don't paste large content": when an LLM relay (a cheap subagent whose
+only job is to run a CLI command on someone else's behalf) has to *retype* a multi-paragraph prompt inside
+its own tool call, it can silently truncate or paraphrase it — confirmed in production (2026-09-05, docker-
+multi repo): a dispatch prompt of only ~1-2KB arrived at its destination containing just the leading
+`Context {}` header, with the rest of the task description gone, no error anywhere. This is not a size-limit
+problem (the prompt was small) — it is a relay-fidelity problem: retyping is not guaranteed to be verbatim.
+Fix: never have a relay retype a long prompt into its own command. Write it to a file first, and have the
+relay pass a short file-path reference instead — this is a stronger, mechanical version of "reference
+instead of paste" for the specific case where the reference itself would normally be inline text embedded in
+someone else's tool call.
