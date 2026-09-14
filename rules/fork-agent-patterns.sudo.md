@@ -47,6 +47,22 @@ If you find yourself about to write "spawn a copy of myself to go look at X", th
 yourself about to write "hand this off to the person/role whose job this actually is", that's a fresh
 named subagent — which is what every current SDD delegation in this repo does, and should keep doing.
 
+## Cross-reference — concrete instances of this rule in this repo
+
+This file documents native `Agent(subagent_type:"fork")` semantics, not a new mechanism this
+plugin implements. For the actual per-role decisions this repo has made (fork adopted for
+`sdd-explore`/`sdd-metrics-reporter` in specific in-session cases, explicitly rejected for
+`sdd-judge`, with the reasoning for each), see:
+
+- `.claude/agents/explore.md`, section "Fork en vez de Task, cuando el caller ya tiene el
+  contexto en sesión"
+- `.claude/agents/sdd-metrics-reporter.md`, section "Fork en vez de Task — con una salvedad de
+  tools" (a fork only inherits the launching context's tool-allowlist — `Bash` isn't automatically
+  available)
+- `.claude/agents/sdd-judge.md`, "Qué NO debes hacer" — the explicit "never fork this agent" rule
+  and why (independence from the builder's framing is a correctness requirement, not an
+  implementation detail)
+
 ## Two-Phase Fan-Out — Evaluated and Rejected
 
 An external architecture doc (actor-model/TupleSpace multi-agent resilience patterns, reviewed 2026-08-31)

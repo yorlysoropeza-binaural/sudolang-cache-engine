@@ -53,6 +53,18 @@ edit, for no gain. Instead:
   fine for a genuine content change, but don't churn those files just to log a status; use a sibling
   file or an appended note instead.
 
+## Model-gated exception — do not generalize this as a workaround
+
+Some Claude model tiers (Opus 5, Opus 4.8, Fable 5/5.1, Mythos 5/5.1) support appending a
+`{"role": "system", ...}` entry to the `messages[]` array mid-conversation as a narrower
+alternative to a brand-new turn/file, without invalidating the cached history prefix. **This is
+NOT available on Sonnet 5** — the model this repo's SDD agents (`sdd-lead`, `sdd-judge`,
+`sdd-metrics-reporter`, etc.) run on by default. Do not rewrite the append-only guidance above to
+recommend this technique as a general-purpose shortcut for this repo's pipeline: on Sonnet 5 it
+either errors or silently no-ops depending on how it's invoked. The append-a-new-message/file
+convention documented above remains the correct approach here regardless of which model tier a
+future agent happens to run on.
+
 ## Ideas Evaluated From an External Doc and Why They Don't Apply Here
 
 An external architecture brief on actor-model resilience and Claude prompt-cache engineering (reviewed

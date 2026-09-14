@@ -28,6 +28,15 @@ This is also why this repo keeps `~/.claude/skills` curated to a small always-lo
 CLAUDE.md → "Skills: where to look") rather than listing all ~800 skills every turn: the same
 progressive-disclosure principle applied at the whole-session level, not just per-agent.
 
+## Cross-reference — this is documentation of a native mechanism, not a new one
+
+The `.md`-stays-short / deep-content-in-a-Skill split described above is how Claude Code's
+Skills-on-demand loading already works natively — this file documents the pattern, it doesn't add
+capability beyond it. See `docker-multi/AGENTS.md` rule 155 for where this repo's own
+`sdd-*`/`.claude/agents/*.md` files apply exactly this split, and `docker-multi/CLAUDE.md`'s
+"Skills: where to look" section for the (currently unenforced) intended curation design at the
+whole-session level referenced above.
+
 ## Authoring Checklist
 
 Before adding a new example, checklist, or reference block to an agent's `.md` system prompt, ask:
