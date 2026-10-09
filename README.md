@@ -33,21 +33,23 @@ mechanism.
 
 ## Scope, explicitly
 
-- No live telemetry: nothing here reads real cache-hit data. Findings are static analysis
-  against the rules above, not measurement.
-- No enforcement: there is no hook, CI check, or pre-commit wiring — `/sudolang-cache-engine:
-  cache-audit` only runs when someone invokes it by hand.
-- `settings.json` documents Anthropic's real default TTL values for reference but nothing in
-  this plugin reads it at runtime (see its own `_deprecated` note).
+- Telemetry is minimal: a `Stop` hook (`hooks/hooks.json` → `scripts/cache_report.py`) appends
+  real per-response cache usage to `${CLAUDE_PLUGIN_DATA}/cache-usage.jsonl` and warns on a
+  probable prefix break. Everything else (`/cache-audit`, `/cache-test`) is static analysis.
+- No enforcement: no CI check or pre-commit wiring — the commands only run when invoked by hand.
+- `rules/` is a reference directory, not a Claude Code plugin component: it is not auto-injected.
+  The umbrella skill points to each rule.
+- No plugin `settings.json`: Claude Code only honors `agent` and `subagentStatusLine` there.
 
 ## Two copies exist — keep them in sync manually
 
 The source of truth for editing is this git submodule
 (`docker-multi/sudolang-cache-engine/`). Claude Code actually loads plugin content from an
 **installed copy** at `~/.claude/plugins/cache/local/sudolang-cache-engine/1.0.0/` (a real copy,
-not a symlink). Editing only the submodule has no runtime effect until you `cp -r` the changed
-paths (`agents/`, `commands/`, `rules/`, `skills/`, `settings.json`,
-`.claude-plugin/plugin.json`) over the installed copy. See `docker-multi/CLAUDE.md`'s "SudoLang
+not a symlink). Editing only the submodule has no runtime effect until you copy the changed
+paths over the installed copy. Run `scripts/sync-plugin.sh` (diff by default, `--apply` to copy);
+it covers `agents/`, `commands/`, `hooks/`, `rules/`, `scripts/`, `skills/` and
+`.claude-plugin/plugin.json`. See `docker-multi/CLAUDE.md`'s "SudoLang
 Cache Engine plugin" section for the full detail and the incident that surfaced this.
 
 ## Where the actionable guidance is actually used

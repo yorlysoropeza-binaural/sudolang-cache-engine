@@ -1,7 +1,0 @@
-{
-  "_deprecated": "Nothing in this plugin (all content is prompt .md files, no scripts/hooks) reads these values — confirmed by audit 2026-09-14. They document real Anthropic prompt-cache defaults (5min default / 1h extended TTL) as reference values for rules/ttl-management.sudo.md, but are not wired to any runtime behavior. Kept for backward compatibility in case something external references this file; do not add new logic that depends on it being read automatically.",
-  "ttl_extended_seconds": 3600,
-  "ttl_default_seconds": 300,
-  "cache_prefix": "sce",
-  "log_level": "info"
-}

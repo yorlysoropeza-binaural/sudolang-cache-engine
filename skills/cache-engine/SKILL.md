@@ -46,8 +46,8 @@ readability win for the model, independent of caching:
 ## Constraints
 - The stable prefix of this agent's system prompt MUST NOT change between invocations
 - Dates, UUIDs, and per-call file paths MUST appear only in the trailing dynamic block
-- Token budget: keep the stable block small enough to be worth caching (roughly 1024+ tokens —
-  below Anthropic's minimum cacheable block size, a breakpoint has no effect)
+- Token budget: keep the stable block small enough to be worth caching, but above the model's minimum
+  cacheable size (it varies by model — check the docs; below it a breakpoint has no effect)
 ```
 
 ### 3. Cache Stability Rules (lo que de verdad afecta el cache hit)
@@ -77,9 +77,9 @@ independent of caching:
 | Flow | "First do this, then do that, finally..." | `step1 \|> step2 \|> step3` | ~25% |
 
 These figures are directional (character/token-count comparisons of equivalent phrasings), not a measured
-property of this plugin — there is no built-in instrumentation reading real
-`cache_creation_input_tokens`/`cache_read_input_tokens` from API responses (see `commands/cache-audit.md`
-for what auditing actually means here).
+property of this plugin. Real numbers come from the Stop hook's `cache-usage.jsonl`
+(`cache_creation_input_tokens`/`cache_read_input_tokens` per response); `commands/cache-audit.md` remains
+a static lint of templates.
 
 ### 5. Handoff/Template Format
 
@@ -142,7 +142,13 @@ a retry dispatch) — a lint on the template you write, not a live measurement a
 
 This skill informs:
 - How agent `.md` system prompts and `Task()`/dispatch prompt templates in this repo are structured
-- `rules/` in this plugin, injected as always-on guidance for anyone authoring such templates
+- `rules/` in this plugin: reference files (Claude Code does not auto-inject a plugin `rules/`
+  directory). Read the one you need: `cache-architecture`, `temporal-layering`,
+  `stigmergic-coordination`, `progressive-disclosure`, `fork-agent-patterns`, `ttl-management`,
+  `subagent-model-policy` (model/effort/context per subagent), `context-hygiene` (prefix stability,
+  compaction, skill listing cost). Dated decisions: `cache-engine-history`.
+- The Stop hook (`hooks/hooks.json` → `scripts/cache_report.py`) records real cache usage per response to
+  `${CLAUDE_PLUGIN_DATA}/cache-usage.jsonl` and warns on a probable prefix break
 - Real prompt caching happens via Claude Code's / the Agent SDK's automatic `cache_control` placement on
   system prompt and tool definitions, or via explicit `cache_control` blocks when calling the Messages
   API directly — this skill does not itself set those breakpoints

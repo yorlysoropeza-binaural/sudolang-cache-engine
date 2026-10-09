@@ -1,87 +1,65 @@
 # TTL Management — SudoLang Constraints
 
-You document real Anthropic prompt-cache TTL mechanics, and the append-only convention for state updates
-that keeps a long-running agent conversation/session cache-friendly.
+You document real Anthropic prompt-cache mechanics and the append-only convention for state updates
+that keeps a long-running agent conversation cache-friendly. Incident narratives and dated decisions
+live in `skills/cache-engine-history` (loaded on demand), not here.
 
-## TTL Rules (mecánica real, no inventada)
+## Request layout and prefix invalidation
 
-| Cache breakpoint type | TTL | Notes |
-|------------------------|-----|-------|
-| Default ephemeral breakpoint | 300s (5 min) | Applies unless the extended-cache option is used |
-| Extended breakpoint (`ENABLE_PROMPT_CACHING_1H` / 1h beta) | 3600s (1 h) | Higher write cost than the 5-min breakpoint, same 0.1x read discount |
+A request is cached as one prefix in this order: **tools → system → messages**. A byte that changes at
+one level invalidates that level and everything after it. Consequences:
 
-There is no "subscription tier" (Pro/Max vs Free) that changes this TTL — the tier only affects usage
-limits, not cache TTL. TTL is a property of the breakpoint the caller sets on the request, available to
-any caller (Claude Code sessions, direct API/SDK usage) that opts into the extended option.
+- Changing the tool set (adding/removing an MCP server whose tools are not deferred) invalidates system and messages.
+- Changing system content (CLAUDE.md edit applied on reload, model switch, effort switch) invalidates messages.
+- Appending a message invalidates nothing before it.
+- The cache is keyed per working directory: parallel worktrees do not share a prefix.
 
-## TTL Behavior — No Decay, Refresh on Hit
+## TTL and cost (verify prices against the current pricing page before quoting numbers)
 
-**There is no gradual TTL decay by hit count.** A cache entry's TTL is fixed at write time (5 min or 1 h)
-and is **refreshed to its full value on every cache hit** within that window — it does not shrink to 75%,
-50%, 25% or any fraction as hits accumulate. If the window elapses with no hit, the entry expires and the
-next request pays the full write cost again (`cache_creation_input_tokens`, priced ≈1.25x normal input)
-instead of the read discount (`cache_read_input_tokens`, priced ≈0.1x normal input).
+| Breakpoint type | TTL | Write cost vs base input | Read cost vs base input |
+|-----------------|-----|--------------------------|--------------------------|
+| Default ephemeral | 5 min | ≈1.25x | ≈0.1x |
+| Extended (`ENABLE_PROMPT_CACHING_1H`, `promptCacheTtl`) | 1 h | ≈2x | ≈0.1x |
 
-## Stale Cache Handling
+- TTL is a property of the breakpoint, not of a subscription tier.
+- Breakpoints of both TTLs can coexist in one request; the 1 h breakpoints must come before the 5 min ones.
+- Subagents default to 5 min (`subagentPromptCacheTtl`); a subagent that waits on a long job can opt in
+  to 1 h in its own frontmatter (`experimental: { cacheTtl: 1h }`).
+- 1 h pays off only when the same prefix is reused after more than 5 min idle. Otherwise the 2x write is
+  waste. Decide from measured data (`cache-usage.jsonl`, written by the Stop hook), not by assumption.
+- Minimum cacheable prefix depends on the model; below it a breakpoint has no effect. Check the current
+  docs for the model in use instead of assuming one number.
 
-If a request arrives after the TTL window has elapsed with no hit:
-1. The cache entry is gone — there's nothing to invalidate explicitly, it simply isn't there anymore.
-2. The request is processed as a fresh write: full input cost for that block, plus the ~1.25x write
-   surcharge, and a new TTL window starts from this write.
-3. This is visible in the API response's `usage.cache_creation_input_tokens` (nonzero) vs.
-   `usage.cache_read_input_tokens` (zero for that block).
+## TTL behavior — no decay, refresh on hit
 
-## Append-Only State Updates (evita romper el prefijo)
+A cache entry's TTL is fixed at write time and refreshed to its full value on every hit that reads it.
+It never shrinks with hit count. A hit refreshes only the prefix actually read, not later breakpoints.
+If the window elapses with no hit, the next request pays the write cost again
+(`usage.cache_creation_input_tokens` nonzero, `cache_read_input_tokens` zero for that block).
 
-Once a stable block (system prompt, tool defs, or an early conversation turn) has been cached, **never
-rewrite it** to inject a status update — that invalidates the cache for everything downstream of the
-edit, for no gain. Instead:
+## Append-only state updates (never break the prefix)
 
-- Append new information as a new message/turn at the end of the conversation (or, for headless
-  agent-to-agent handoffs, as a **new** file/job, never an edit of a previous one).
-- This repo's SDD pipeline already follows this: each OpenCode dispatch gets a new `job_id` under
-  `src/.sdd/logs/jobs/<job_id>/` (moved 2026-09-05 from `/tmp/sdd-jobs/<job_id>/`, which didn't survive a
-  host reboot — same append-only principle, just a persistent root), and a retry after a `sdd-judge` FAIL is
-  a **new** dispatch with a fresh `Context {}` block carrying a "Contexto de reintento: ..." field — it never
-  edits the previous `dispatch.handoff`. `src/.sdd/logs/metrics.jsonl` is the clearest example of this in the
-  repo: every dispatch/result/orphaned transition is an **appended** JSON line, never a rewrite of a prior
-  one — the file grows monotonically and stays valid to `tail`/stream even while a job is still running.
-  Keep replicating that shape for any new stigmergic state (see `stigmergic-coordination.sudo.md`): write a
-  new state file/message (or append a line), don't mutate the old one in place.
-- Corollary for anyone editing an agent's own `.md` definition or a shared `AGENTS.md`/`CLAUDE.md`-style
-  doc mid-session: expect that edit to cost a fresh cache write on the next turn that loads it — that's
-  fine for a genuine content change, but don't churn those files just to log a status; use a sibling
-  file or an appended note instead.
+Once a stable block (tool defs, system prompt, an early turn) has been cached, never rewrite it to inject
+a status update — that invalidates everything downstream for no gain. Instead:
 
-## Model-gated exception — do not generalize this as a workaround
+- Append new information as a new message/turn at the end (for headless agent-to-agent handoffs: a new
+  file/job, never an edit of a previous one).
+- Each OpenCode dispatch gets a new `job_id` under `src/.sdd/logs/jobs/<job_id>/`; a retry is a new
+  dispatch with a fresh `Context {}` block carrying the retry reason, never an edit of the old
+  `dispatch.handoff`. `src/.sdd/logs/metrics.jsonl` is the model: appended lines, never rewritten.
+- Editing an agent `.md`, `AGENTS.md` or `CLAUDE.md` mid-session costs a cache write on the next turn
+  that loads it. Fine for a real content change; do not churn those files to log status — use a sibling
+  file or an appended note.
 
-Some Claude model tiers (Opus 5, Opus 4.8, Fable 5/5.1, Mythos 5/5.1) support appending a
-`{"role": "system", ...}` entry to the `messages[]` array mid-conversation as a narrower
-alternative to a brand-new turn/file, without invalidating the cached history prefix. **This is
-NOT available on Sonnet 5** — the model this repo's SDD agents (`sdd-lead`, `sdd-judge`,
-`sdd-metrics-reporter`, etc.) run on by default. Do not rewrite the append-only guidance above to
-recommend this technique as a general-purpose shortcut for this repo's pipeline: on Sonnet 5 it
-either errors or silently no-ops depending on how it's invoked. The append-a-new-message/file
-convention documented above remains the correct approach here regardless of which model tier a
-future agent happens to run on.
+## Model-gated techniques — do not generalize
 
-## Ideas Evaluated From an External Doc and Why They Don't Apply Here
+Some model tiers allow appending a `{"role": "system"}` entry mid-conversation without invalidating the
+cached history. Support varies by model and changes over time: check the current docs for the exact
+model before relying on it, and keep the append-a-new-message/file convention as the default.
 
-An external architecture brief on actor-model resilience and Claude prompt-cache engineering (reviewed
-2026-08-31) proposed several mechanisms that were checked against this repo and found inapplicable — kept
-here so the doc doesn't get re-evaluated from scratch next time someone reads it:
+## Not applicable here
 
-- **Rolling/rotating cache breakpoints for a 20-content-block lookback limit**: this only matters for a
-  caller constructing raw Anthropic Messages API requests and manually placing `cache_control` breakpoints.
-  A repo-wide grep confirmed zero such calls in this codebase (`anthropic.Client`/`messages.create`/
-  `cache_control` as executed code) — every Claude interaction goes through the Claude Code harness, and
-  every OpenCode interaction through the `opencode` CLI, both of which manage their own breakpoint
-  placement internally. Nothing here to hook into.
-- **Deterministic tool-definition serialization** (alphabetical sort + `sort_keys=True` before hashing):
-  same reasoning — tool defs are serialized by the harness, not by any code in this repo.
-- **A custom `ClaudeCacheMiddleware` wrapping `messages.create()`**: not applicable for the same reason;
-  there is no direct SDK client construction anywhere in the SDD scripts or agent configs to wrap.
-
-If this repo ever adds a component that calls the Anthropic SDK directly (bypassing Claude Code/OpenCode),
-re-evaluate these three against that new code specifically — they were rejected for lack of a callsite, not
-because the underlying mechanics are wrong.
+Rolling breakpoints, deterministic tool-definition serialization and a `messages.create()` cache
+middleware only matter for code that calls the Messages API directly. This repo has no such call site
+(all Claude traffic goes through Claude Code, all OpenCode traffic through the `opencode` CLI). Re-evaluate
+only if a component that calls the SDK directly is added.
