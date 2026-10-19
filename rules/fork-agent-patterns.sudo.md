@@ -63,6 +63,19 @@ plugin implements. For the actual per-role decisions this repo has made (fork ad
   and why (independence from the builder's framing is a correctness requirement, not an
   implementation detail)
 
+## Fork availability changed (Claude Code 2.1.302, 2026-10-16)
+
+Per the Claude Code changelog, fork subagents (`subagent_type: "fork"`) are now on by default in `claude -p`,
+the Agent SDK, the desktop app and VS Code, as they already were in the terminal; `CLAUDE_CODE_FORK_SUBAGENT=0`
+turns them off, and `claude mcp serve` never offers them. Consequences for this repo:
+
+- Headless runs can now fork, so a prompt that says "use a subagent" may get a fork that inherits the whole
+  parent context. For SDD delegations that must stay narrow (`sdd-builder` -> `senior-dev`, `sdd-qc` ->
+  `code-reviewer`), keep naming the role explicitly; do not rely on the default.
+- If a pipeline must never fork (reproducible cost, restricted context), set `CLAUDE_CODE_FORK_SUBAGENT=0`
+  in that environment instead of discovering it from a bill.
+- Verify the behaviour on the installed version (`claude --version`) before relying on it.
+
 ## Two-Phase Fan-Out — Evaluated and Rejected
 
 An external architecture doc (actor-model/TupleSpace multi-agent resilience patterns, reviewed 2026-08-31)

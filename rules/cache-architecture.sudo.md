@@ -41,8 +41,9 @@ breakpoint effective, it does not create the breakpoint by itself.
 ## Sizing Guidance
 
 There's no fixed "optimal" token budget — a stable block only pays off if it's (a) large enough that
-caching it is worth the write cost (Anthropic requires roughly 1024+ tokens per cacheable block for the
-breakpoint to have any effect) and (b) genuinely reused byte-for-byte across multiple calls. A 200-token
+caching it is worth the write cost (the minimum is per model: 512 tokens on the Claude 5.5 models, 1,024 on
+Sonnet 5 / 4.x, up to 4,096 on Opus 4.5/4.6 and Haiku 4.5 per the docs checked 2026-10-19; below it the
+breakpoint silently has no effect, no error) and (b) genuinely reused byte-for-byte across multiple calls. A 200-token
 system prompt reused twice isn't worth engineering around; a multi-KB agent definition or `Task()`
 template reused across dozens of dispatches is.
 

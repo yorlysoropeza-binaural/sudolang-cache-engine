@@ -9,7 +9,7 @@ NEVER include these in a template's cache-stable part:
 - Current date/time (`2026-08-09`, `now()`)
 - UUIDs or random identifiers
 - File hashes or checksums
-- User-specific or session-specific paths (`/home/user/...`, `/tmp/sdd-jobs/<job_id>/...`)
+- User-specific or session-specific paths (`/home/user/...`, `src/.sdd/logs/jobs/<job_id>/...`)
 - Session IDs, job IDs, or request IDs
 - Any value from `datetime.now()`, `uuid4()`, `os.urandom()`
 

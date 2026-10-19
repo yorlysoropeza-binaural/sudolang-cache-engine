@@ -48,8 +48,8 @@ The source of truth for editing is this git submodule
 **installed copy** at `~/.claude/plugins/cache/local/sudolang-cache-engine/1.0.0/` (a real copy,
 not a symlink). Editing only the submodule has no runtime effect until you copy the changed
 paths over the installed copy. Run `scripts/sync-plugin.sh` (diff by default, `--apply` to copy);
-it covers `agents/`, `commands/`, `hooks/`, `rules/`, `scripts/`, `skills/` and
-`.claude-plugin/plugin.json`. See `docker-multi/CLAUDE.md`'s "SudoLang
+it covers `agents/`, `commands/`, `hooks/`, `rules/`, `scripts/`, `skills/`, `README.md` and the whole
+`.claude-plugin/` directory (not `tests/`: they only run from the source repo). See `docker-multi/CLAUDE.md`'s "SudoLang
 Cache Engine plugin" section for the full detail and the incident that surfaced this.
 
 ## Where the actionable guidance is actually used

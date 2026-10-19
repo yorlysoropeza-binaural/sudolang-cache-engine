@@ -18,8 +18,12 @@ one level invalidates that level and everything after it. Consequences:
 
 | Breakpoint type | TTL | Write cost vs base input | Read cost vs base input |
 |-----------------|-----|--------------------------|--------------------------|
-| Default ephemeral | 5 min | ≈1.25x | ≈0.1x |
-| Extended (`ENABLE_PROMPT_CACHING_1H`, `promptCacheTtl`) | 1 h | ≈2x | ≈0.1x |
+| Default ephemeral | 5 min | ≈1.25x | ≈0.1x (model-dependent, see below) |
+| Extended (`ENABLE_PROMPT_CACHING_1H`, `promptCacheTtl`) | 1 h | ≈2x | ≈0.1x (model-dependent, see below) |
+
+Read cost is not one number: per the prompt-caching docs (checked 2026-10-19) it is 0.1x in general, 0.05x on
+Opus 5.5 / Sonnet 5.5 and 0.025x on Fable 5.1 / Mythos 5.1. The Stop hook's `ieq` follows that
+(`read_weight` in `scripts/cache_report.py`); re-check it when a new model ships.
 
 - TTL is a property of the breakpoint, not of a subscription tier.
 - Breakpoints of both TTLs can coexist in one request; the 1 h breakpoints must come before the 5 min ones.
@@ -36,6 +40,16 @@ A cache entry's TTL is fixed at write time and refreshed to its full value on ev
 It never shrinks with hit count. A hit refreshes only the prefix actually read, not later breakpoints.
 If the window elapses with no hit, the next request pays the write cost again
 (`usage.cache_creation_input_tokens` nonzero, `cache_read_input_tokens` zero for that block).
+
+## Idle compaction and measuring the TTL split (Claude Code 2.1.299 / 2.1.300)
+
+- Idle compaction (2.1.299, 2026-10-14, terminal): a conversation of 200K+ tokens left idle ~54 minutes is
+  compacted before its one-hour cache expires, so the next message does not reprocess everything. Tune the
+  minimum with `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS`; `"idleCompaction": false` in settings.json disables it
+  (also a row in `/config`, 2.1.302). It complements "compact before a long pause" and only helps with 1 h TTL.
+- OpenTelemetry `api_request` events carry `cache_creation_5m_tokens` and `cache_creation_1h_tokens`
+  (2.1.300), the same split the Stop hook records as `write_5m` / `write_1h`. Use either to decide whether the
+  1 h TTL pays off.
 
 ## Append-only state updates (never break the prefix)
 

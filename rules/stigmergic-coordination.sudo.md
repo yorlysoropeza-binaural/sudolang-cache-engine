@@ -57,25 +57,26 @@ If two agents can write to the same artifact concurrently (e.g. two parallel `Ta
 wanting to update `tasks.md`), that's a real hazard (lost writes) — prefer one writer per artifact per
 phase (this repo's SDD pipeline already is single-writer-per-phase) over ad hoc concurrent writes.
 
-## Declaring the Active Stage
+## Declaring the Active Phase
 
-Every `Context {}` block dispatched into this pipeline should declare which SDD phase is active, e.g.:
+Every `Context {}` block dispatched into this pipeline should declare which SDD phase is active, e.g. (the field is `phase:` —
+the name `scripts/sdd_opencode_run.sh` reads and records in `metrics.jsonl`; earlier drafts called it `stage:`):
 
 ```
 Context {
-  stage: spec | plan | tasks | build | qc
+  phase: spec | plan | tasks | build | qc | review-fix   # optional; defaults to "pipeline"
   <artifact>_ref: <path>#<section/id>
 }
 ```
 
 **Exception — full-pipeline dispatch**: this repo's "Modo Delegación" dispatches the entire pipeline in one
 `Context {}` block (`agent: sdd-lead`, which internally chains spec→architect→pm→builder→qc itself) rather
-than one phase at a time. There, `stage` doesn't apply — omitting it isn't a missing field, it's the correct
+than one phase at a time. There, `phase` doesn't apply — omitting it isn't a missing field, it's the correct
 shape for "all stages, single dispatch." Only phase-by-phase dispatch (Modo Manual, targeting `@sdd-spec` /
-`@sdd-architect` / etc. individually) needs to declare `stage`.
+`@sdd-architect` / etc. individually) needs to declare `phase`.
 
 This is a lightweight borrowing of the "stage → allowed actions" idea from an external actor-model/FSM
-architecture doc (reviewed 2026-08-31) — without adopting a real finite-state-machine engine: `stage` is
+architecture doc (reviewed 2026-08-31) — without adopting a real finite-state-machine engine: `phase` is
 just a stable, explicit field, not a new enforcement mechanism (the actual enforcement of what an agent may
 touch in a given stage is still OpenCode's `permission` guardrails, see `sdd-opencode-guardrails`). Two
 benefits: it makes which phase produced a given dispatch traceable at a glance, and — since it's a small,

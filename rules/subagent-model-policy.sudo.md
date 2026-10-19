@@ -19,6 +19,21 @@ for its own system prompt, tool list and (unless omitted) CLAUDE.md.
   only if measured idle gaps exceed 5 min; otherwise keep the 5 min default.
 - Prefer one fork/subagent per independent question; never fan out the same context to several agents.
 
+## Delegating to OpenCode: what this plugin can and cannot say
+
+OpenCode jobs (`scripts/sdd_opencode_run.sh` in docker-multi) run in their own process with their own provider
+and model (see `src/.opencode/opencode.json`), not Claude models through this session.
+
+- The Stop hook only sees Claude usage: the main thread and, via `cache-usage-subagents.jsonl`, each Claude
+  subagent. An OpenCode job shows up there only as the cost of the relay (`sdd-opencode-runner`) and the
+  judge, never as the job's own tokens.
+- Frente Estable / Fondo Volátil, TTL choice and fork rules do not apply inside an OpenCode job; they apply to
+  the Claude-side prompts that build the dispatch (the `Context {}` block, the prompt file). Keep those
+  stable-first and volatile-last, and pass the prompt as a file path (`"@<path>"`).
+- To attribute spend, join `cache-usage-subagents.jsonl` (`jobs` field, set for `sdd-opencode-runner`,
+  `sdd-judge` and `sdd-lead`) with `src/.sdd/logs/metrics.jsonl` (`job`, `phase`). OpenCode's own cost comes
+  from `opencode stats` and the `opencode_session` recorded in the `result` event, not from this plugin.
+
 ## Verify
 
 Check frontmatter against the current Claude Code docs (`sub-agents`) before relying on a field; some
