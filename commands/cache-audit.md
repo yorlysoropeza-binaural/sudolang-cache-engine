@@ -31,6 +31,11 @@ handoff-drift risks (this reads files, not live API usage metrics — there is n
    - Confirm no rule/doc in scope claims a hit-based TTL decay or a model-side "cache breakpoint" inside
      its own reply — both are incorrect; see `rules/ttl-management.sudo.md`
 
+4b. **Injected Rulesets**
+   - If a plugin/hook appends a ruleset to a system prompt, confirm it is read from a static file, its mode is
+     pinned and recorded per job, it is scoped by agent and also applied on compaction
+     (`rules/injected-rulesets.sudo.md`)
+
 5. **Generate Report**
    ```json
    {
